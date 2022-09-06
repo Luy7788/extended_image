@@ -39,22 +39,28 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
   @override
   void initState() {
     super.initState();
-    _initGestureConfig();
-    WidgetsBinding.instance?.addPostFrameCallback((_) async {
-      await Future.delayed(Duration(milliseconds: 10));
-      if (mounted) {
-        setState(() {
-          if (_editorConfig?.initialCropScale != null){
-            _editActionDetails!.totalScale = _editorConfig!.initialCropScale!;
-          }
-          if (_editorConfig?.initialCropOffset != null) {
-            _editActionDetails!.screenFocalPoint = _editorConfig!.initialCropOffset;
-          }
-          // _editActionDetails!.delta = Offset(150, 50);
-          // _editorConfig!.editActionDetailsIsChanged?.call(_editActionDetails);
-        });
-      }
+    WidgetsBinding.instance?.addPostFrameCallback((_) {
+      _initLoadRectConfig();
     });
+    _initGestureConfig();
+  }
+
+  _initLoadRectConfig() async {
+    await Future.delayed(Duration(milliseconds: 20));
+    if (mounted) {
+      setState(() {
+        if (_editorConfig?.initialCropScale != null){
+          _editActionDetails!.totalScale = _editorConfig!.initialCropScale!;
+          // _editActionDetails!.preTotalScale = _editorConfig!.initialCropScale!;
+        }
+        if (_editorConfig?.initialCropOffset != null) {
+          _editActionDetails!.screenFocalPoint = _editorConfig!.initialCropOffset;
+        }
+        if (_editorConfig?.initScreenDestinationRect != null) {
+          _editActionDetails!.setScreenDestinationRect(_editorConfig!.initScreenDestinationRect!);
+        }
+      });
+    }
   }
 
   void _initGestureConfig() {

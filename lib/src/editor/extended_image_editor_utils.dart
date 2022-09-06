@@ -381,6 +381,7 @@ class EditorConfig {
     this.reverseMousePointerScrollDirection = false,
     this.initialCropOffset,
     this.initialCropScale,
+    this.initScreenDestinationRect,
   })  : assert(lineHeight > 0.0),
         assert(hitTestSize > 0.0),
         assert(maxScale > 0.0),
@@ -449,6 +450,8 @@ class EditorConfig {
   final double? initialCropScale;
 
   final Offset? initialCropOffset;
+
+  final Rect? initScreenDestinationRect;
 }
 
 class CropAspectRatios {
