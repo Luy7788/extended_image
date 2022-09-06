@@ -379,6 +379,8 @@ class EditorConfig {
     this.hitTestBehavior = HitTestBehavior.deferToChild,
     this.editActionDetailsIsChanged,
     this.reverseMousePointerScrollDirection = false,
+    this.initialCropOffset,
+    this.initialCropScale,
   })  : assert(lineHeight > 0.0),
         assert(hitTestSize > 0.0),
         assert(maxScale > 0.0),
@@ -442,6 +444,11 @@ class EditorConfig {
   /// true: zoom int => up, zoom out => down
   /// default is false
   final bool reverseMousePointerScrollDirection;
+
+  /// initial crop
+  final double? initialCropScale;
+
+  final Offset? initialCropOffset;
 }
 
 class CropAspectRatios {

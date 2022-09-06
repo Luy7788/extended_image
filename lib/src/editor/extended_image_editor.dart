@@ -40,6 +40,21 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
   void initState() {
     super.initState();
     _initGestureConfig();
+    WidgetsBinding.instance?.addPostFrameCallback((_) async {
+      await Future.delayed(Duration(milliseconds: 10));
+      if (mounted) {
+        setState(() {
+          if (_editorConfig?.initialCropScale != null){
+            _editActionDetails!.totalScale = _editorConfig!.initialCropScale!;
+          }
+          if (_editorConfig?.initialCropOffset != null) {
+            _editActionDetails!.screenFocalPoint = _editorConfig!.initialCropOffset;
+          }
+          // _editActionDetails!.delta = Offset(150, 50);
+          // _editorConfig!.editActionDetailsIsChanged?.call(_editActionDetails);
+        });
+      }
+    });
   }
 
   void _initGestureConfig() {
@@ -141,6 +156,7 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
                           InitCropRectType.layoutRect &&
                       _editorConfig!.cropAspectRatio != null &&
                       _editorConfig!.cropAspectRatio! > 0) {
+                    //计算裁剪框坐标
                     final Rect rect = _initCropRect(layoutRect);
                     _editActionDetails!.totalScale = _editActionDetails!
                         .preTotalScale = doubleCompare(
