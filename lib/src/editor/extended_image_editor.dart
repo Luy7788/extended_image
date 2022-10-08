@@ -51,7 +51,7 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
       setState(() {
         if (_editorConfig?.initialCropScale != null){
           _editActionDetails!.totalScale = _editorConfig!.initialCropScale!;
-          // _editActionDetails!.preTotalScale = _editorConfig!.initialCropScale!;
+          _editActionDetails!.preTotalScale = _editorConfig!.initialCropScale!;
         }
         if (_editorConfig?.initialCropOffset != null) {
           _editActionDetails!.screenFocalPoint = _editorConfig!.initialCropOffset;
