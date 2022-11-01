@@ -1,10 +1,11 @@
 import 'dart:ui' as ui show Image;
-import 'package:flutter/material.dart';
-import 'package:extended_image/src/editor/extended_image_editor_utils.dart';
-import 'package:extended_image/src/gesture/extended_image_gesture_utils.dart';
-import 'package:extended_image/src/extended_image_typedef.dart';
-import 'package:extended_image/src/image/extended_render_image.dart';
+
+import 'package:extended_image/src/editor/editor_utils.dart';
+import 'package:extended_image/src/gesture/utils.dart';
+import 'package:extended_image/src/image/render_image.dart';
+import 'package:extended_image/src/typedef.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 /// A widget that displays a [dart:ui.Image] directly.
 ///
@@ -24,6 +25,7 @@ class ExtendedRawImage extends LeafRenderObjectWidget {
     this.height,
     this.scale = 1.0,
     this.color,
+    this.opacity,
     this.colorBlendMode,
     this.fit,
     this.alignment = Alignment.center,
@@ -38,7 +40,43 @@ class ExtendedRawImage extends LeafRenderObjectWidget {
     this.gestureDetails,
     this.editActionDetails,
     this.isAntiAlias = false,
+    this.debugImageLabel,
   }) : super(key: key);
+
+  @override
+  ExtendedRenderImage createRenderObject(BuildContext context) {
+    assert((!matchTextDirection && alignment is Alignment) ||
+        debugCheckHasDirectionality(context));
+    assert(
+        image?.debugGetOpenHandleStackTraces()?.isNotEmpty ?? true,
+        'Creator of a RawImage disposed of the image when the RawImage still '
+        'needed it.');
+    return ExtendedRenderImage(
+      image: image?.clone(),
+      width: width,
+      height: height,
+      scale: scale,
+      color: color,
+      opacity: opacity,
+      colorBlendMode: colorBlendMode,
+      fit: fit,
+      alignment: alignment,
+      repeat: repeat,
+      centerSlice: centerSlice,
+      matchTextDirection: matchTextDirection,
+      textDirection: matchTextDirection || alignment is! Alignment
+          ? Directionality.of(context)
+          : null,
+      invertColors: invertColors,
+      filterQuality: filterQuality,
+      sourceRect: sourceRect,
+      beforePaintImage: beforePaintImage,
+      afterPaintImage: afterPaintImage,
+      gestureDetails: gestureDetails,
+      editActionDetails: editActionDetails,
+      isAntiAlias: isAntiAlias,
+    );
+  }
 
   /// Whether to paint the image with anti-aliasing.
   ///
@@ -79,6 +117,20 @@ class ExtendedRawImage extends LeafRenderObjectWidget {
 
   /// If non-null, this color is blended with each image pixel using [colorBlendMode].
   final Color? color;
+
+  /// If non-null, the value from the [Animation] is multiplied with the opacity
+  /// of each image pixel before painting onto the canvas.
+  ///
+  /// This is more efficient than using [FadeTransition] to change the opacity
+  /// of an image, since this avoids creating a new composited layer. Composited
+  /// layers may double memory usage as the image is painted onto an offscreen
+  /// render target.
+  ///
+  /// See also:
+  ///
+  ///  * [AlwaysStoppedAnimation], which allows you to create an [Animation]
+  ///    from a single opacity value.
+  final Animation<double>? opacity;
 
   /// Used to set the filterQuality of the image
   /// Use the "low" quality setting to scale the image, which corresponds to
@@ -173,72 +225,8 @@ class ExtendedRawImage extends LeafRenderObjectWidget {
   ///it work when centerSlice==null
   final Rect? sourceRect;
 
-  @override
-  ExtendedRenderImage createRenderObject(BuildContext context) {
-    assert((!matchTextDirection && alignment is Alignment) ||
-        debugCheckHasDirectionality(context));
-    assert(
-        image?.debugGetOpenHandleStackTraces()?.isNotEmpty ?? true,
-        'Creator of a RawImage disposed of the image when the RawImage still '
-        'needed it.');
-    return ExtendedRenderImage(
-      image: image?.clone(),
-      width: width,
-      height: height,
-      scale: scale,
-      color: color,
-      colorBlendMode: colorBlendMode,
-      fit: fit,
-      alignment: alignment,
-      repeat: repeat,
-      centerSlice: centerSlice,
-      matchTextDirection: matchTextDirection,
-      textDirection: matchTextDirection || alignment is! Alignment
-          ? Directionality.of(context)
-          : null,
-      invertColors: invertColors,
-      filterQuality: filterQuality,
-      sourceRect: sourceRect,
-      beforePaintImage: beforePaintImage,
-      afterPaintImage: afterPaintImage,
-      gestureDetails: gestureDetails,
-      editActionDetails: editActionDetails,
-      isAntiAlias: isAntiAlias,
-    );
-  }
-
-  @override
-  void updateRenderObject(
-      BuildContext context, ExtendedRenderImage renderObject) {
-    assert(
-        image?.debugGetOpenHandleStackTraces()?.isNotEmpty ?? true,
-        'Creator of a RawImage disposed of the image when the RawImage still '
-        'needed it.');
-    renderObject
-      ..image = image?.clone()
-      ..width = width
-      ..height = height
-      ..scale = scale
-      ..color = color
-      ..colorBlendMode = colorBlendMode
-      ..alignment = alignment
-      ..fit = fit
-      ..repeat = repeat
-      ..centerSlice = centerSlice
-      ..matchTextDirection = matchTextDirection
-      ..textDirection = matchTextDirection || alignment is! Alignment
-          ? Directionality.of(context)
-          : null
-      ..invertColors = invertColors
-      ..filterQuality = filterQuality
-      ..afterPaintImage = afterPaintImage
-      ..beforePaintImage = beforePaintImage
-      ..sourceRect = sourceRect
-      ..gestureDetails = gestureDetails
-      ..editActionDetails = editActionDetails
-      ..isAntiAlias = isAntiAlias;
-  }
-
+  /// A string identifying the source of the image.
+  final String? debugImageLabel;
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
@@ -262,5 +250,44 @@ class ExtendedRawImage extends LeafRenderObjectWidget {
         value: matchTextDirection, ifTrue: 'match text direction'));
     properties.add(DiagnosticsProperty<bool>('invertColors', invertColors));
     properties.add(EnumProperty<FilterQuality>('filterQuality', filterQuality));
+  }
+
+  @override
+  void updateRenderObject(
+      BuildContext context, ExtendedRenderImage renderObject) {
+    assert(
+        image?.debugGetOpenHandleStackTraces()?.isNotEmpty ?? true,
+        'Creator of a RawImage disposed of the image when the RawImage still '
+        'needed it.');
+    renderObject
+      ..image = image?.clone()
+      ..width = width
+      ..height = height
+      ..scale = scale
+      ..color = color
+      ..opacity = opacity
+      ..colorBlendMode = colorBlendMode
+      ..alignment = alignment
+      ..fit = fit
+      ..repeat = repeat
+      ..centerSlice = centerSlice
+      ..matchTextDirection = matchTextDirection
+      ..textDirection = matchTextDirection || alignment is! Alignment
+          ? Directionality.of(context)
+          : null
+      ..invertColors = invertColors
+      ..filterQuality = filterQuality
+      ..afterPaintImage = afterPaintImage
+      ..beforePaintImage = beforePaintImage
+      ..sourceRect = sourceRect
+      ..gestureDetails = gestureDetails
+      ..editActionDetails = editActionDetails
+      ..isAntiAlias = isAntiAlias;
+  }
+
+  @override
+  void didUnmountRenderObject(ExtendedRenderImage renderObject) {
+    // Have the render object dispose its image handle.
+    renderObject.image = null;
   }
 }

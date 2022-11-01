@@ -1,9 +1,10 @@
 import 'dart:math';
 import 'dart:ui' as ui show Image;
+
 import 'package:example/main.dart';
 import 'package:extended_image/extended_image.dart';
-import 'package:flutter/material.dart';
 import 'package:ff_annotation_route_core/ff_annotation_route_core.dart';
+import 'package:flutter/material.dart';
 
 @FFRoute(
   name: 'fluttercandies://paintimage',
@@ -110,7 +111,7 @@ class _PaintImageDemoState extends State<PaintImageDemo> {
   ) {
     const int numPoints = 1000;
     final List<Offset> points = <Offset>[];
-    final double dt = 2 * pi / numPoints;
+    const double dt = 2 * pi / numPoints;
 
     for (double t = 0.0; t <= 2 * pi; t += dt) {
       final Offset oo = Offset(doX(t), doY(t));

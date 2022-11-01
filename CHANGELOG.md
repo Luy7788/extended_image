@@ -1,13 +1,93 @@
+## 6.3.1
+
+* fix issue that rebuild viewportDimension is not right when pageSpacing is not zero(ExtendedImageGesturePageView #516)
+
+## 6.3.0
+
+* Migrate to 3.3.0
+
+## 6.2.1
+
+* Add DeviceGestureSettings for ExtendedVerticalDragGestureRecognizer and ExtendedHorizontalDragGestureRecognizer.(#482,#483)
+
+## 6.2.0
+
+* Migrate to 3.0.0
+
+## 6.1.0
+
+* override == and hashCode for ExtendedResizeImage
+* fix issue that ExtendedResizeImage can't get rawImageData(#477)
+* ExtendedResizeImage.maxBytes is actual bytes of Image, not decode bytes.
+* fix issue that max scale look bigger after zoom in and zoom out (#476)
+
+## 6.0.3
+
+* Improve:
+  add [EditorConfig.initialCropAspectRatio] to support to set initial CropAspectRatio(#462 It's good for that you can set initial CropAspectRatio at first time and set CropAspectRatio to custom, so that the users can change CropAspectRatio as they want). 
+
+
+## 6.0.2+1
+
+* Issues:
+  1. Hide `FileImage` from `extended_image_library` explicitly.
+
+## 6.0.2
+
+* Issues:
+  1. Remove the deprecated constructor for the `ExtendedVelocityTracker`. (#460)
+  2. Hide `File` from `extended_image_library` explicitly.
+
+## 6.0.1
+
+* Issues:
+  Fix VelocityTracker is not type ExtendedVelocityTracker
+
+## 6.0.0
+
+* Breaking change:
+  Migrate to 2.8
+
+## 5.1.3
+
+* Issues:
+  1. fix issue that solve gesture conflict between MovePage and vertical pan.
+
+## 5.1.2
+
+* Issues:
+  1. fix issue that mouse wheel/double tap are not working.(#404)
+
+## 5.1.1
+
+* Bumping flutter sdk minimum version to 2.5.0
+## 5.1.0
+
+* Improve:
+  add [ExtendedPageController.shouldIgnorePointerWhenScrolling] to solve issue that we can's zoom image before [PageView] stop scroll in two way.  
+
+## 5.0.0
+
+* Improve:
+  1. solve gesture conflict between Scale and Horizontal/Vertical drag.
+  2. support to set page spacing. [ExtendedPageController.pageSpacing]
+  3. add [ExtendedImage.opacity].
+  4. fix that we can't zoom image before [PageView] stop scroll.
+
+* Breaking change:
+  1. use [ExtendedPageController] instead of [PageController].
+  2. use [ExtendedImageGesturePageView.canScrollPage] instead of [ExtendedImageGesturePageView.canMovePage].
+
 ## 4.2.1
 
 * Improve:
-  fix description of reverseMousePointerScrollDirection
+  1. fix description of reverseMousePointerScrollDirection
 
 ## 4.2.0
 
 * Issues:
-  fix issue that inverse zoom by mouse wheel.(#382)
-  fix issue that crop_layer with/height is negative
+  1. fix issue that inverse zoom by mouse wheel.(#382)
+  2. fix issue that crop_layer with/height is negative
 
 ## 4.1.0
 

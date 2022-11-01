@@ -1,10 +1,12 @@
-import 'dart:math';
 import 'dart:ui' as ui show Image;
-import 'package:extended_image/src/editor/extended_image_editor_utils.dart';
-import 'package:extended_image/src/gesture/extended_image_gesture_utils.dart';
-import 'package:extended_image/src/extended_image_typedef.dart';
+
+import 'package:extended_image/src/editor/editor_utils.dart';
+import 'package:extended_image/src/gesture/utils.dart';
+import 'package:extended_image/src/typedef.dart';
 import 'package:flutter/material.dart' hide Image;
 import 'package:flutter/rendering.dart';
+
+import 'painting.dart';
 
 class ExtendedRenderImage extends RenderBox {
   /// Creates a render box that displays an image.
@@ -19,6 +21,7 @@ class ExtendedRenderImage extends RenderBox {
     double? height,
     double scale = 1.0,
     Color? color,
+    Animation<double>? opacity,
     BlendMode? colorBlendMode,
     BoxFit? fit,
     AlignmentGeometry alignment = Alignment.center,
@@ -27,18 +30,19 @@ class ExtendedRenderImage extends RenderBox {
     bool matchTextDirection = false,
     TextDirection? textDirection,
     bool invertColors = false,
+    bool isAntiAlias = false,
     FilterQuality filterQuality = FilterQuality.low,
     Rect? sourceRect,
     AfterPaintImage? afterPaintImage,
     BeforePaintImage? beforePaintImage,
     GestureDetails? gestureDetails,
     EditActionDetails? editActionDetails,
-    bool isAntiAlias = false,
   })  : _image = image,
         _width = width,
         _height = height,
         _scale = scale,
         _color = color,
+        _opacity = opacity,
         _colorBlendMode = colorBlendMode,
         _fit = fit,
         _alignment = alignment,
@@ -47,13 +51,13 @@ class ExtendedRenderImage extends RenderBox {
         _matchTextDirection = matchTextDirection,
         _invertColors = invertColors,
         _textDirection = textDirection,
+        _isAntiAlias = isAntiAlias,
         _filterQuality = filterQuality,
         _sourceRect = sourceRect,
         _beforePaintImage = beforePaintImage,
         _afterPaintImage = afterPaintImage,
         _gestureDetails = gestureDetails,
-        _editActionDetails = editActionDetails,
-        _isAntiAlias = isAntiAlias {
+        _editActionDetails = editActionDetails {
     _updateColorFilter();
   }
 
@@ -214,6 +218,24 @@ class ExtendedRenderImage extends RenderBox {
     _color = value;
     _updateColorFilter();
     markNeedsPaint();
+  }
+
+  /// If non-null, the value from the [Animation] is multiplied with the opacity
+  /// of each image pixel before painting onto the canvas.
+  Animation<double>? get opacity => _opacity;
+  Animation<double>? _opacity;
+  set opacity(Animation<double>? value) {
+    if (value == _opacity) {
+      return;
+    }
+
+    if (attached) {
+      _opacity?.removeListener(markNeedsPaint);
+    }
+    _opacity = value;
+    if (attached) {
+      value?.addListener(markNeedsPaint);
+    }
   }
 
   /// Used to set the filterQuality of the image
@@ -443,6 +465,18 @@ class ExtendedRenderImage extends RenderBox {
   }
 
   @override
+  void attach(covariant PipelineOwner owner) {
+    super.attach(owner);
+    _opacity?.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _opacity?.removeListener(markNeedsPaint);
+    super.detach();
+  }
+
+  @override
   void paint(PaintingContext context, Offset offset) {
     if (_image == null) {
       return;
@@ -455,24 +489,34 @@ class ExtendedRenderImage extends RenderBox {
       rect = rect.shift(-gestureDetails!.slidePageOffset!);
     }
     paintExtendedImage(
-        canvas: context.canvas,
-        rect: rect,
-        image: _image!,
-        debugImageLabel: debugImageLabel,
-        scale: _scale,
-        colorFilter: _colorFilter,
-        fit: _fit,
-        alignment: _resolvedAlignment!,
-        centerSlice: _centerSlice,
-        repeat: _repeat,
-        flipHorizontally: _flipHorizontally!,
-        invertColors: invertColors,
-        filterQuality: _filterQuality,
-        customSourceRect: _sourceRect,
-        beforePaintImage: beforePaintImage,
-        afterPaintImage: afterPaintImage,
-        gestureDetails: gestureDetails,
-        editActionDetails: editActionDetails);
+      canvas: context.canvas,
+      rect: rect,
+      image: _image!,
+      debugImageLabel: debugImageLabel,
+      scale: _scale,
+      opacity: _opacity?.value ?? 1.0,
+      colorFilter: _colorFilter,
+      fit: _fit,
+      alignment: _resolvedAlignment!,
+      centerSlice: _centerSlice,
+      repeat: _repeat,
+      flipHorizontally: _flipHorizontally!,
+      invertColors: invertColors,
+      filterQuality: _filterQuality,
+      isAntiAlias: _isAntiAlias,
+      customSourceRect: _sourceRect,
+      beforePaintImage: beforePaintImage,
+      afterPaintImage: afterPaintImage,
+      gestureDetails: gestureDetails,
+      editActionDetails: editActionDetails,
+    );
+  }
+
+  @override
+  void dispose() {
+    _image?.dispose();
+    _image = null;
+    super.dispose();
   }
 
   @override
@@ -500,247 +544,5 @@ class ExtendedRenderImage extends RenderBox {
         defaultValue: null));
     properties.add(DiagnosticsProperty<bool>('invertColors', invertColors));
     properties.add(EnumProperty<FilterQuality>('filterQuality', filterQuality));
-  }
-}
-
-void paintExtendedImage({
-  required Canvas canvas,
-  required Rect rect,
-  required ui.Image image,
-  String? debugImageLabel,
-  double scale = 1.0,
-  ColorFilter? colorFilter,
-  BoxFit? fit,
-  Alignment alignment = Alignment.center,
-  Rect? centerSlice,
-  ImageRepeat repeat = ImageRepeat.noRepeat,
-  bool flipHorizontally = false,
-  bool invertColors = false,
-  FilterQuality filterQuality = FilterQuality.low,
-  Rect? customSourceRect,
-  //you can paint anything if you want before paint image.
-  BeforePaintImage? beforePaintImage,
-  //you can paint anything if you want after paint image.
-  AfterPaintImage? afterPaintImage,
-  GestureDetails? gestureDetails,
-  EditActionDetails? editActionDetails,
-  bool isAntiAlias = false,
-}) {
-  if (rect.isEmpty) {
-    return;
-  }
-
-  Size outputSize = rect.size;
-  Size inputSize = Size(image.width.toDouble(), image.height.toDouble());
-
-  final Offset topLeft = rect.topLeft;
-
-  // if (editActionDetails != null && editActionDetails.isHalfPi) {
-  //   outputSize = Size(outputSize.height, outputSize.width);
-  //   var center = rect.center;
-  //   topLeft = Rect.fromLTWH(center.dx - rect.height / 2.0,
-  //           center.dy - rect.width / 2.0, rect.height, rect.width)
-  //       .topLeft;
-  // }
-
-  late Offset sliceBorder;
-  if (centerSlice != null) {
-    sliceBorder = Offset(centerSlice.left + inputSize.width - centerSlice.right,
-        centerSlice.top + inputSize.height - centerSlice.bottom);
-    outputSize = outputSize - sliceBorder as Size;
-    inputSize = inputSize - sliceBorder as Size;
-  }
-  fit ??= centerSlice == null ? BoxFit.scaleDown : BoxFit.fill;
-  assert(centerSlice == null || (fit != BoxFit.none && fit != BoxFit.cover));
-  final FittedSizes fittedSizes =
-      applyBoxFit(fit, inputSize / scale, outputSize);
-  final Size sourceSize = fittedSizes.source * scale;
-  Size destinationSize = fittedSizes.destination;
-  if (centerSlice != null) {
-    outputSize += sliceBorder;
-    destinationSize += sliceBorder;
-    // We don't have the ability to draw a subset of the image at the same time
-    // as we apply a nine-patch stretch.
-    assert(sourceSize == inputSize,
-        'centerSlice was used with a BoxFit that does not guarantee that the image is fully visible.');
-  }
-  if (repeat != ImageRepeat.noRepeat && destinationSize == outputSize) {
-    // There's no need to repeat the image because we're exactly filling the
-    // output rect with the image.
-    repeat = ImageRepeat.noRepeat;
-  }
-  final Paint paint = Paint()..isAntiAlias = isAntiAlias;
-  if (colorFilter != null) {
-    paint.colorFilter = colorFilter;
-  }
-  if (sourceSize != destinationSize) {
-    paint.filterQuality = filterQuality;
-  }
-  paint.invertColors = invertColors;
-  final double halfWidthDelta =
-      (outputSize.width - destinationSize.width) / 2.0;
-  final double halfHeightDelta =
-      (outputSize.height - destinationSize.height) / 2.0;
-  final double dx = halfWidthDelta +
-      (flipHorizontally ? -alignment.x : alignment.x) * halfWidthDelta;
-  final double dy = halfHeightDelta + alignment.y * halfHeightDelta;
-  final Offset destinationPosition = topLeft.translate(dx, dy);
-  Rect destinationRect = destinationPosition & destinationSize;
-
-  bool needClip = false;
-
-  if (gestureDetails != null) {
-    destinationRect =
-        gestureDetails.calculateFinalDestinationRect(rect, destinationRect);
-
-    ///outside and need clip
-    needClip = outRect(rect, destinationRect);
-
-    if (gestureDetails.slidePageOffset != null) {
-      destinationRect = destinationRect.shift(gestureDetails.slidePageOffset!);
-      rect = rect.shift(gestureDetails.slidePageOffset!);
-    }
-
-    if (needClip) {
-      canvas.save();
-      canvas.clipRect(rect);
-    }
-  }
-  bool hasEditAction = false;
-  if (editActionDetails != null) {
-    if (editActionDetails.cropRectPadding != null) {
-      destinationRect = getDestinationRect(
-          inputSize: inputSize,
-          rect: editActionDetails.cropRectPadding!.deflateRect(rect),
-          fit: fit,
-          flipHorizontally: false,
-          scale: scale,
-          centerSlice: centerSlice,
-          alignment: alignment);
-    }
-
-    editActionDetails.initRect(rect, destinationRect);
-
-    destinationRect = editActionDetails.getFinalDestinationRect();
-
-    ///outside and need clip
-    needClip = outRect(rect, destinationRect);
-
-    hasEditAction = editActionDetails.hasEditAction;
-
-    if (needClip || hasEditAction) {
-      canvas.save();
-      if (needClip) {
-        canvas.clipRect(rect);
-      }
-    }
-
-    if (hasEditAction) {
-      final Offset origin =
-          editActionDetails.screenCropRect?.center ?? destinationRect.center;
-
-      final Matrix4 result = Matrix4.identity();
-
-      final EditActionDetails editAction = editActionDetails;
-
-      result.translate(
-        origin.dx,
-        origin.dy,
-      );
-
-      if (editAction.hasRotateAngle) {
-        result.multiply(Matrix4.rotationZ(editAction.rotateRadian));
-      }
-
-      if (editAction.flipY) {
-        result.multiply(Matrix4.rotationY(pi));
-      }
-
-      if (editAction.flipX) {
-        result.multiply(Matrix4.rotationX(pi));
-      }
-
-      result.translate(-origin.dx, -origin.dy);
-      canvas.transform(result.storage);
-      destinationRect = editAction.paintRect(destinationRect);
-    }
-  }
-
-  if (beforePaintImage != null) {
-    final bool handle = beforePaintImage(canvas, destinationRect, image, paint);
-    if (handle) {
-      return;
-    }
-  }
-
-  final bool needSave = repeat != ImageRepeat.noRepeat || flipHorizontally;
-  if (needSave) {
-    canvas.save();
-  }
-  if (repeat != ImageRepeat.noRepeat) {
-    canvas.clipRect(rect);
-  }
-  if (flipHorizontally) {
-    final double dx = -(rect.left + rect.width / 2.0);
-    canvas.translate(-dx, 0.0);
-    canvas.scale(-1.0, 1.0);
-    canvas.translate(dx, 0.0);
-  }
-
-  if (centerSlice == null) {
-    final Rect sourceRect = customSourceRect ??
-        alignment.inscribe(sourceSize, Offset.zero & inputSize);
-    for (final Rect tileRect
-        in _generateImageTileRects(rect, destinationRect, repeat)) {
-      canvas.drawImageRect(image, sourceRect, tileRect, paint);
-    }
-  } else {
-    for (final Rect tileRect
-        in _generateImageTileRects(rect, destinationRect, repeat)) {
-      canvas.drawImageNine(image, centerSlice, tileRect, paint);
-    }
-  }
-
-  if (needSave) {
-    canvas.restore();
-  }
-
-  if (needClip || hasEditAction) {
-    canvas.restore();
-  }
-
-  if (afterPaintImage != null) {
-    afterPaintImage(canvas, destinationRect, image, paint);
-  }
-}
-
-Iterable<Rect> _generateImageTileRects(
-    Rect outputRect, Rect fundamentalRect, ImageRepeat repeat) sync* {
-  if (repeat == ImageRepeat.noRepeat) {
-    yield fundamentalRect;
-    return;
-  }
-
-  int startX = 0;
-  int startY = 0;
-  int stopX = 0;
-  int stopY = 0;
-  final double strideX = fundamentalRect.width;
-  final double strideY = fundamentalRect.height;
-
-  if (repeat == ImageRepeat.repeat || repeat == ImageRepeat.repeatX) {
-    startX = ((outputRect.left - fundamentalRect.left) / strideX).floor();
-    stopX = ((outputRect.right - fundamentalRect.right) / strideX).ceil();
-  }
-
-  if (repeat == ImageRepeat.repeat || repeat == ImageRepeat.repeatY) {
-    startY = ((outputRect.top - fundamentalRect.top) / strideY).floor();
-    stopY = ((outputRect.bottom - fundamentalRect.bottom) / strideY).ceil();
-  }
-
-  for (int i = startX; i <= stopX; ++i) {
-    for (int j = startY; j <= stopY; ++j) {
-      yield fundamentalRect.shift(Offset(i * strideX, j * strideY));
-    }
   }
 }

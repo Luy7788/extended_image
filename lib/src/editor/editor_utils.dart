@@ -1,8 +1,8 @@
 import 'dart:math';
-import 'package:extended_image/src/extended_image_typedef.dart';
+import 'package:extended_image/src/typedef.dart';
 import 'package:flutter/material.dart';
 
-import '../extended_image_utils.dart';
+import '../utils.dart';
 
 class EditActionDetails {
   double _rotateRadian = 0.0;
@@ -248,13 +248,14 @@ class EditActionDetails {
       else {
         if (_screenDestinationRect != screenCropRect) {
           final bool topSame =
-              doubleEqual(_screenDestinationRect!.top, screenCropRect!.top);
+              _screenDestinationRect!.topIsSame(screenCropRect!);
           final bool leftSame =
-              doubleEqual(_screenDestinationRect!.left, screenCropRect!.left);
-          final bool bottomSame = doubleEqual(
-              _screenDestinationRect!.bottom, screenCropRect!.bottom);
+              _screenDestinationRect!.leftIsSame(screenCropRect!);
+          final bool bottomSame =
+              _screenDestinationRect!.bottomIsSame(screenCropRect!);
           final bool rightSame =
-              doubleEqual(_screenDestinationRect!.right, screenCropRect!.right);
+              _screenDestinationRect!.rightIsSame(screenCropRect!);
+
           if (topSame && bottomSame) {
             delta = Offset(delta.dx, 0.0);
           } else if (leftSame && rightSame) {
@@ -274,11 +275,10 @@ class EditActionDetails {
       if (screenCropRect != null) {
         Rect rect = screenCropRect!.expandToInclude(_screenDestinationRect!);
         if (rect != _screenDestinationRect) {
-          final bool topSame = doubleEqual(rect.top, screenCropRect!.top);
-          final bool leftSame = doubleEqual(rect.left, screenCropRect!.left);
-          final bool bottomSame =
-              doubleEqual(rect.bottom, screenCropRect!.bottom);
-          final bool rightSame = doubleEqual(rect.right, screenCropRect!.right);
+          final bool topSame = rect.topIsSame(screenCropRect!);
+          final bool leftSame = rect.leftIsSame(screenCropRect!);
+          final bool bottomSame = rect.bottomIsSame(screenCropRect!);
+          final bool rightSame = rect.rightIsSame(screenCropRect!);
 
           // make sure that image rect keep same aspect ratio
           if (topSame && bottomSame) {
@@ -301,6 +301,10 @@ class EditActionDetails {
           }
           totalScale =
               totalScale / (rect.width / _screenDestinationRect!.width);
+          // init totalScale
+          if (_rawDestinationRect!.isSame(_rawDestinationRect!)) {
+            totalScale = 1.0;
+          }
           preTotalScale = totalScale;
           _screenDestinationRect = rect;
         }
@@ -324,13 +328,13 @@ class EditActionDetails {
   Rect computeBoundary(Rect result, Rect layoutRect) {
     if (_computeHorizontalBoundary) {
       //move right
-      if (doubleCompare(result.left, layoutRect.left) >= 0) {
+      if (result.left.greaterThanOrEqualTo(layoutRect.left)) {
         result = Rect.fromLTWH(
             layoutRect.left, result.top, result.width, result.height);
       }
 
       ///move left
-      if (doubleCompare(result.right, layoutRect.right) <= 0) {
+      if (result.right.lessThanOrEqualTo(layoutRect.right)) {
         result = Rect.fromLTWH(layoutRect.right - result.width, result.top,
             result.width, result.height);
       }
@@ -338,24 +342,24 @@ class EditActionDetails {
 
     if (_computeVerticalBoundary) {
       //move down
-      if (doubleCompare(result.bottom, layoutRect.bottom) <= 0) {
+      if (result.bottom.lessThanOrEqualTo(layoutRect.bottom)) {
         result = Rect.fromLTWH(result.left, layoutRect.bottom - result.height,
             result.width, result.height);
       }
 
       //move up
-      if (doubleCompare(result.top, layoutRect.top) >= 0) {
+      if (result.top.greaterThanOrEqualTo(layoutRect.top)) {
         result = Rect.fromLTWH(
             result.left, layoutRect.top, result.width, result.height);
       }
     }
 
     _computeHorizontalBoundary =
-        doubleCompare(result.left, layoutRect.left) <= 0 &&
-            doubleCompare(result.right, layoutRect.right) >= 0;
+        result.left.lessThanOrEqualTo(layoutRect.left) &&
+            result.right.greaterThanOrEqualTo(layoutRect.right);
 
-    _computeVerticalBoundary = doubleCompare(result.top, layoutRect.top) <= 0 &&
-        doubleCompare(result.bottom, layoutRect.bottom) >= 0;
+    _computeVerticalBoundary = result.top.lessThanOrEqualTo(layoutRect.top) &&
+        result.bottom.greaterThanOrEqualTo(layoutRect.bottom);
     return result;
   }
 }
@@ -373,6 +377,7 @@ class EditorConfig {
     this.animationDuration = const Duration(milliseconds: 200),
     this.tickerDuration = const Duration(milliseconds: 400),
     this.cropAspectRatio = CropAspectRatios.custom,
+    this.initialCropAspectRatio = CropAspectRatios.custom,
     this.initCropRectType = InitCropRectType.imageRect,
     this.cropLayerPainter = const EditorCropLayerPainter(),
     this.speed = 1.0,
@@ -383,7 +388,7 @@ class EditorConfig {
     this.initialCropScale,
     this.initScreenDestinationRect,
   })  : assert(lineHeight > 0.0),
-        assert(hitTestSize > 0.0),
+        assert(hitTestSize >= 0.0),
         assert(maxScale > 0.0),
         assert(speed > 0.0);
 
@@ -429,7 +434,17 @@ class EditorConfig {
 
   /// Aspect ratio of crop rect
   /// default is custom
+  ///
+  /// Typically the aspect ratio will not be changed during the editing process,
+  /// but it might be relevant with states (e.g. [ExtendedImageState]).
   final double? cropAspectRatio;
+
+  /// Initial Aspect ratio of crop rect
+  /// default is custom
+  ///
+  /// The argument only affects the initial aspect ratio,
+  /// users can set it based on the desire despite of [cropAspectRatio].
+  final double? initialCropAspectRatio;
 
   /// Init crop rect base on initial image rect or image layout rect
   final InitCropRectType initCropRectType;

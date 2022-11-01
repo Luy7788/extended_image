@@ -1,16 +1,15 @@
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:extended_image/src/extended_image_utils.dart';
-import 'package:extended_image/src/image/extended_raw_image.dart';
+import 'package:extended_image/src/image/raw_image.dart';
+import 'package:extended_image/src/utils.dart';
 import 'package:extended_image_library/extended_image_library.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import '../extended_image.dart';
-import 'extended_image_crop_layer.dart';
-
-import 'extended_image_editor_utils.dart';
+import 'crop_layer.dart';
+import 'editor_utils.dart';
 
 ///
 ///  create by zmtzawqlp on 2019/8/22
@@ -69,6 +68,7 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
             .extendedImageState.imageWidget.initEditorConfigHandler
             ?.call(widget.extendedImageState) ??
         EditorConfig();
+
     if (cropAspectRatio != _editorConfig!.cropAspectRatio) {
       _editActionDetails = null;
     }
@@ -139,6 +139,17 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
                 layoutRect = padding.deflateRect(layoutRect);
 
                 if (_editActionDetails!.cropRect == null) {
+                  final AlignmentGeometry alignment =
+                      widget.extendedImageState.imageWidget.alignment;
+                  //matchTextDirection: extendedImage.matchTextDirection,
+                  //don't support TextDirection for editor
+                  final TextDirection? textDirection =
+                      //extendedImage.matchTextDirection ||
+                      alignment is! Alignment
+                          ? Directionality.of(context)
+                          : null;
+                  final Alignment resolvedAlignment =
+                      alignment.resolve(textDirection);
                   final Rect destinationRect = getDestinationRect(
                       rect: layoutRect,
                       inputSize: Size(
@@ -152,8 +163,7 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
                       fit: widget.extendedImageState.imageWidget.fit,
                       centerSlice:
                           widget.extendedImageState.imageWidget.centerSlice,
-                      alignment:
-                          widget.extendedImageState.imageWidget.alignment,
+                      alignment: resolvedAlignment,
                       scale:
                           widget.extendedImageState.extendedImageInfo!.scale);
 
@@ -165,9 +175,8 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
                     //计算裁剪框坐标
                     final Rect rect = _initCropRect(layoutRect);
                     _editActionDetails!.totalScale = _editActionDetails!
-                        .preTotalScale = doubleCompare(
-                                destinationRect.width, destinationRect.height) >
-                            0
+                        .preTotalScale = destinationRect.width
+                            .greaterThan(destinationRect.height)
                         ? rect.height / cropRect.height
                         : rect.width / cropRect.width;
                     cropRect = rect;
@@ -204,17 +213,31 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
   }
 
   Rect _initCropRect(Rect rect) {
-    Rect cropRect = _editActionDetails!.getRectWithScale(rect);
-
     if (_editActionDetails!.cropAspectRatio != null) {
-      final double aspectRatio = _editActionDetails!.cropAspectRatio!;
-      double width = cropRect.width / aspectRatio;
-      final double height = min(cropRect.height, width);
-      width = height * aspectRatio;
-      cropRect = Rect.fromCenter(
-          center: cropRect.center, width: width, height: height);
+      return _calculateCropRectFromAspectRatio(
+        rect,
+        _editActionDetails!.cropAspectRatio!,
+      );
     }
-    return cropRect;
+    if (_editorConfig!.initialCropAspectRatio != null) {
+      return _calculateCropRectFromAspectRatio(
+        rect,
+        _editorConfig!.initialCropAspectRatio!,
+      );
+    }
+    return _editActionDetails!.getRectWithScale(rect);
+  }
+
+  Rect _calculateCropRectFromAspectRatio(Rect rect, double aspectRatio) {
+    final Rect cropRect = _editActionDetails!.getRectWithScale(rect);
+    final double height = min(cropRect.height, cropRect.width / aspectRatio);
+    final double width = height * aspectRatio;
+
+    return Rect.fromCenter(
+      center: cropRect.center,
+      width: width,
+      height: height,
+    );
   }
 
   void _handleScaleStart(ScaleStartDetails details) {
@@ -243,7 +266,7 @@ class ExtendedImageEditorState extends State<ExtendedImageEditor> {
     _startingOffset = details.focalPoint;
     //no more zoom
     if ((_editActionDetails!.reachCropRectEdge && zoomOut) ||
-        doubleEqual(_editActionDetails!.totalScale, _editorConfig!.maxScale) &&
+        _editActionDetails!.totalScale.equalTo(_editorConfig!.maxScale) &&
             zoomIn) {
       //correct _startingScale
       //details.scale was not calcuated at the moment

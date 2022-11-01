@@ -1,68 +1,25 @@
 //import 'dart:typed_data';
 import 'dart:isolate';
-import 'dart:typed_data';
 import 'dart:ui';
-import 'package:flutter/foundation.dart';
-
-// ignore: implementation_imports
-import 'package:http/src/response.dart';
-import 'package:http_client_helper/http_client_helper.dart';
 
 // import 'package:isolate/load_balancer.dart';
 // import 'package:isolate/isolate_runner.dart';
 import 'package:extended_image/extended_image.dart';
+import 'package:flutter/foundation.dart';
+// ignore: implementation_imports
+import 'package:http_client_helper/http_client_helper.dart';
 import 'package:image/image.dart';
 import 'package:image_editor/image_editor.dart';
 
 // final Future<LoadBalancer> loadBalancer =
 //     LoadBalancer.create(1, IsolateRunner.spawn);
 
-Future<dynamic> isolateDecodeImage(List<int> data) async {
-  final ReceivePort response = ReceivePort();
-  await Isolate.spawn(_isolateDecodeImage, response.sendPort);
-  final dynamic sendPort = await response.first;
-  final ReceivePort answer = ReceivePort();
-  // ignore: always_specify_types
-  sendPort.send([answer.sendPort, data]);
-  return answer.first;
-}
-
-void _isolateDecodeImage(SendPort port) {
-  final ReceivePort rPort = ReceivePort();
-  port.send(rPort.sendPort);
-  rPort.listen((dynamic message) {
-    final SendPort send = message[0] as SendPort;
-    final List<int> data = message[1] as List<int>;
-    send.send(decodeImage(data));
-  });
-}
-
-Future<dynamic> isolateEncodeImage(Image src) async {
-  final ReceivePort response = ReceivePort();
-  await Isolate.spawn(_isolateEncodeImage, response.sendPort);
-  final dynamic sendPort = await response.first;
-  final ReceivePort answer = ReceivePort();
-  // ignore: always_specify_types
-  sendPort.send([answer.sendPort, src]);
-  return answer.first;
-}
-
-void _isolateEncodeImage(SendPort port) {
-  final ReceivePort rPort = ReceivePort();
-  port.send(rPort.sendPort);
-  rPort.listen((dynamic message) {
-    final SendPort send = message[0] as SendPort;
-    final Image src = message[1] as Image;
-    send.send(encodeJpg(src));
-  });
-}
-
 Future<Uint8List?> cropImageDataWithDartLibrary(
     {required ExtendedImageEditorState state}) async {
   print('dart library start cropping');
 
   ///crop rect base on raw image
-  final Rect? cropRect = state.getCropRect();
+  Rect cropRect = state.getCropRect()!;
 
   print('getCropRect : $cropRect');
 
@@ -87,6 +44,21 @@ Future<Uint8List?> cropImageDataWithDartLibrary(
       //     .asUint8List()
       : state.rawImageData;
 
+  if (data == state.rawImageData &&
+      state.widget.extendedImageState.imageProvider is ExtendedResizeImage) {
+    final ImmutableBuffer buffer =
+        await ImmutableBuffer.fromUint8List(state.rawImageData);
+    final ImageDescriptor descriptor = await ImageDescriptor.encoded(buffer);
+    final double widthRatio = descriptor.width / state.image!.width;
+    final double heightRatio = descriptor.height / state.image!.height;
+    cropRect = Rect.fromLTRB(
+      cropRect.left * widthRatio,
+      cropRect.top * heightRatio,
+      cropRect.right * widthRatio,
+      cropRect.bottom * heightRatio,
+    );
+  }
+
   final EditActionDetails editAction = state.editAction!;
 
   final DateTime time1 = DateTime.now();
@@ -107,7 +79,7 @@ Future<Uint8List?> cropImageDataWithDartLibrary(
       image = bakeOrientation(image);
 
       if (editAction.needCrop) {
-        image = copyCrop(image, cropRect!.left.toInt(), cropRect.top.toInt(),
+        image = copyCrop(image, cropRect.left.toInt(), cropRect.top.toInt(),
             cropRect.width.toInt(), cropRect.height.toInt());
       }
 
@@ -164,8 +136,22 @@ Future<Uint8List?> cropImageDataWithDartLibrary(
 Future<Uint8List?> cropImageDataWithNativeLibrary(
     {required ExtendedImageEditorState state}) async {
   print('native library start cropping');
+  Rect cropRect = state.getCropRect()!;
+  if (state.widget.extendedImageState.imageProvider is ExtendedResizeImage) {
+    final ImmutableBuffer buffer =
+        await ImmutableBuffer.fromUint8List(state.rawImageData);
+    final ImageDescriptor descriptor = await ImageDescriptor.encoded(buffer);
 
-  final Rect? cropRect = state.getCropRect();
+    final double widthRatio = descriptor.width / state.image!.width;
+    final double heightRatio = descriptor.height / state.image!.height;
+    cropRect = Rect.fromLTRB(
+      cropRect.left * widthRatio,
+      cropRect.top * heightRatio,
+      cropRect.right * widthRatio,
+      cropRect.bottom * heightRatio,
+    );
+  }
+
   final EditActionDetails action = state.editAction!;
 
   final int rotateAngle = action.rotateAngle.toInt();
@@ -176,7 +162,7 @@ Future<Uint8List?> cropImageDataWithNativeLibrary(
   final ImageEditorOption option = ImageEditorOption();
 
   if (action.needCrop) {
-    option.addOption(ClipOption.fromRect(cropRect!));
+    option.addOption(ClipOption.fromRect(cropRect));
   }
 
   if (action.needFlip) {
@@ -196,6 +182,46 @@ Future<Uint8List?> cropImageDataWithNativeLibrary(
 
   print('${DateTime.now().difference(start)} ：total time');
   return result;
+}
+
+Future<dynamic> isolateDecodeImage(List<int> data) async {
+  final ReceivePort response = ReceivePort();
+  await Isolate.spawn(_isolateDecodeImage, response.sendPort);
+  final dynamic sendPort = await response.first;
+  final ReceivePort answer = ReceivePort();
+  // ignore: always_specify_types
+  sendPort.send([answer.sendPort, data]);
+  return answer.first;
+}
+
+Future<dynamic> isolateEncodeImage(Image src) async {
+  final ReceivePort response = ReceivePort();
+  await Isolate.spawn(_isolateEncodeImage, response.sendPort);
+  final dynamic sendPort = await response.first;
+  final ReceivePort answer = ReceivePort();
+  // ignore: always_specify_types
+  sendPort.send([answer.sendPort, src]);
+  return answer.first;
+}
+
+void _isolateDecodeImage(SendPort port) {
+  final ReceivePort rPort = ReceivePort();
+  port.send(rPort.sendPort);
+  rPort.listen((dynamic message) {
+    final SendPort send = message[0] as SendPort;
+    final List<int> data = message[1] as List<int>;
+    send.send(decodeImage(data));
+  });
+}
+
+void _isolateEncodeImage(SendPort port) {
+  final ReceivePort rPort = ReceivePort();
+  port.send(rPort.sendPort);
+  rPort.listen((dynamic message) {
+    final SendPort send = message[0] as SendPort;
+    final Image src = message[1] as Image;
+    send.send(encodeJpg(src));
+  });
 }
 
 /// it may be failed, due to Cross-domain

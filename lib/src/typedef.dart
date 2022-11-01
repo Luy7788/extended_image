@@ -1,11 +1,11 @@
 import 'dart:ui' as ui show Image;
-import 'package:extended_image/src/extended_image_utils.dart';
-import 'package:extended_image/src/gesture/extended_image_gesture_utils.dart';
+import 'package:extended_image/src/gesture/utils.dart';
+import 'package:extended_image/src/utils.dart';
 import 'package:flutter/material.dart';
 
-import 'editor/extended_image_editor_utils.dart';
-import 'gesture/extended_image_gesture.dart';
-import 'gesture/extended_image_slide_page.dart';
+import 'editor/editor_utils.dart';
+import 'gesture/gesture.dart';
+import 'gesture/slide_page.dart';
 
 ///
 ///  extended_image_typedef.dart
@@ -62,9 +62,6 @@ typedef InitGestureConfigHandler = GestureConfig Function(
 
 /// Call on sliding page
 typedef OnSlidingPage = void Function(ExtendedImageSlidePageState state);
-
-/// Whether we can move to previous/next page only for Image
-typedef CanMovePage = bool Function(GestureDetails? gestureDetails);
 
 /// Whether we can scroll page
 typedef CanScrollPage = bool Function(GestureDetails? gestureDetails);
