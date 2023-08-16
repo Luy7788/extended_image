@@ -647,9 +647,8 @@ class EditorCropLayerPainter {
     //   canvas.drawRect(cropRect, Paint()..blendMode = BlendMode.clear);
     // canvas.restore();
 
-    // draw mask rect instead use BlendMode.clear, web doesn't support now.
-    //left
-
+    // draw mask rect instead use BlendMode.clear, --web-renderer html doesn't support now.
+    // left
     canvas.drawRect(
         Offset.zero & Size(cropRect.left, rect.height),
         Paint()

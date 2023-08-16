@@ -1,35 +1,40 @@
+// ignore_for_file: invalid_use_of_visible_for_testing_member
+
 import 'dart:math';
 import 'dart:ui' as ui show Image;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 
-void paintExtendedImage({
-  required Canvas canvas,
-  required Rect rect,
-  required ui.Image image,
-  String? debugImageLabel,
-  double scale = 1.0,
-  double opacity = 1.0,
-  ColorFilter? colorFilter,
-  BoxFit? fit,
-  Alignment alignment = Alignment.center,
-  Rect? centerSlice,
-  ImageRepeat repeat = ImageRepeat.noRepeat,
-  bool flipHorizontally = false,
-  bool invertColors = false,
-  FilterQuality filterQuality = FilterQuality.low,
-  Rect? customSourceRect,
-  //you can paint anything if you want before paint image.
-  BeforePaintImage? beforePaintImage,
-  //you can paint anything if you want after paint image.
-  AfterPaintImage? afterPaintImage,
-  GestureDetails? gestureDetails,
-  EditActionDetails? editActionDetails,
-  bool isAntiAlias = false,
-}) {
+void paintExtendedImage(
+    {required Canvas canvas,
+    required Rect rect,
+    required ui.Image image,
+    String? debugImageLabel,
+    double scale = 1.0,
+    double opacity = 1.0,
+    ColorFilter? colorFilter,
+    BoxFit? fit,
+    Alignment alignment = Alignment.center,
+    Rect? centerSlice,
+    ImageRepeat repeat = ImageRepeat.noRepeat,
+    bool flipHorizontally = false,
+    bool invertColors = false,
+    FilterQuality filterQuality = FilterQuality.low,
+    Rect? customSourceRect,
+    //you can paint anything if you want before paint image.
+    BeforePaintImage? beforePaintImage,
+    //you can paint anything if you want after paint image.
+    AfterPaintImage? afterPaintImage,
+    GestureDetails? gestureDetails,
+    EditActionDetails? editActionDetails,
+    bool isAntiAlias = false,
+    EdgeInsets layoutInsets = EdgeInsets.zero}) {
   if (rect.isEmpty) {
     return;
   }
+
+  final Rect paintRect = rect;
+  rect = layoutInsets.deflateRect(rect);
 
   Size outputSize = rect.size;
   Size inputSize = Size(image.width.toDouble(), image.height.toDouble());
@@ -103,7 +108,7 @@ void paintExtendedImage({
 
     if (needClip) {
       canvas.save();
-      canvas.clipRect(rect);
+      canvas.clipRect(paintRect);
     }
   }
   bool hasEditAction = false;
@@ -131,7 +136,7 @@ void paintExtendedImage({
     if (needClip || hasEditAction) {
       canvas.save();
       if (needClip) {
-        canvas.clipRect(rect);
+        canvas.clipRect(paintRect);
       }
     }
 
@@ -177,8 +182,9 @@ void paintExtendedImage({
   if (needSave) {
     canvas.save();
   }
-  if (repeat != ImageRepeat.noRepeat) {
-    canvas.clipRect(rect);
+  if (repeat != ImageRepeat.noRepeat && centerSlice != null) {
+    // Don't clip if an image shader is used.
+    canvas.clipRect(paintRect);
   }
   if (flipHorizontally) {
     final double dx = -(rect.left + rect.width / 2.0);
@@ -193,9 +199,12 @@ void paintExtendedImage({
     if (repeat == ImageRepeat.noRepeat) {
       canvas.drawImageRect(image, sourceRect, destinationRect, paint);
     } else {
-      for (final Rect tileRect
-          in _generateImageTileRects(rect, destinationRect, repeat))
-        canvas.drawImageRect(image, sourceRect, tileRect, paint);
+      final ImageTilingInfo info =
+          createTilingInfo(repeat, rect, destinationRect, sourceRect);
+      final ImageShader shader = ImageShader(
+          image, info.tmx, info.tmy, info.transform.storage,
+          filterQuality: filterQuality);
+      canvas.drawRect(rect, paint..shader = shader);
     }
   } else {
     canvas.scale(1 / scale);
@@ -223,8 +232,8 @@ void paintExtendedImage({
   }
 }
 
-Iterable<Rect> _generateImageTileRects(
-    Rect outputRect, Rect fundamentalRect, ImageRepeat repeat) sync* {
+List<Rect> _generateImageTileRects(
+    Rect outputRect, Rect fundamentalRect, ImageRepeat repeat) {
   int startX = 0;
   int startY = 0;
   int stopX = 0;
@@ -242,11 +251,11 @@ Iterable<Rect> _generateImageTileRects(
     stopY = ((outputRect.bottom - fundamentalRect.bottom) / strideY).ceil();
   }
 
-  for (int i = startX; i <= stopX; ++i) {
-    for (int j = startY; j <= stopY; ++j) {
-      yield fundamentalRect.shift(Offset(i * strideX, j * strideY));
-    }
-  }
+  return <Rect>[
+    for (int i = startX; i <= stopX; ++i)
+      for (int j = startY; j <= stopY; ++j)
+        fundamentalRect.shift(Offset(i * strideX, j * strideY)),
+  ];
 }
 
 Rect _scaleRect(Rect rect, double scale) => Rect.fromLTRB(rect.left * scale,
